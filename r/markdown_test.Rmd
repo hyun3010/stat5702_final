@@ -1,0 +1,70 @@
+
+
+```{r}
+
+library(tidyverse)
+library(ggplot2)
+library(maps)
+library(gganimate)
+library(transformr)
+library(scales)
+library(glue)
+library(sqldf)
+
+```
+
+```{r}
+
+df <- read_csv('country_data.csv')
+
+df2 <- df %>% 
+  mutate(fill=case_when(
+    regime == 3 ~ 1,
+    regime == 4 ~ 2,
+    regime == 5 ~ 3,
+    TRUE ~ 4)) %>% 
+  select(ctryname, year, fill, un_continent_name, regime)
+
+
+color_vector <- c("coral1", "darkgoldenrod1", "blueviolet", "cadetblue1", "darkgray")
+
+
+world_map <- map_data('world')
+world_map$region[world_map$region == "Greenland"] <- "Denmark"
+
+map_df <- crossing(world_map %>% distinct(region), 
+  df %>% distinct(year) %>% filter(!is.na(year))) %>% 
+  left_join(world_map) %>% 
+  left_join(df2, by=c('region'='ctryname', 'year' = 'year')) %>% 
+  mutate(fill=if_else(is.na(fill), 5, fill))
+
+
+map_df[,2] <- sapply(map_df[,2],as.integer)
+
+world <- ggplot(map_df, 
+       aes(x=long, y=lat, group=group, fill=factor(fill))) +
+  geom_polygon(color='white', show.legend = TRUE) +
+  scale_fill_manual(values = color_vector, labels=c('Civilian Dictatorship', 
+          'Military  Dictatorship', 'Royal Dictatorship', 'Democracy', 'NA')) +
+  theme(legend.title = element_text(size=22), legend.text = element_text(size=15),
+        title = element_text(size=32), axis.title = element_blank(), 
+        axis.ticks = element_blank(), axis.text = element_blank()) +
+  transition_time(year) +
+  ease_aes('linear') +
+  labs(title = 'Dictatorships of the World, Year: {frame_time}', fill='Gov. Type')
+
+
+```
+
+
+fig.height=20, fig.width=60
+
+```{r}
+
+anim <- animate(world, height = 1000, width = 2000, nframes = 200, fps = 15, end_pause = 45, renderer = gifski_renderer())
+
+anim_save("all_countries11.gif", anim)
+
+anim
+
+```
